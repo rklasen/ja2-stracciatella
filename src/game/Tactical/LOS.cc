@@ -1804,6 +1804,23 @@ INT32 BulletImpactReducedByRange( INT32 iImpact, INT32 iDistanceTravelled, INT32
 }*/
 
 
+// Headgear that covers the eyes takes a creature's spit instead of the wearer,
+// and is chewed up in their place.
+static BOOLEAN ItemShieldsEyesFromSpit(UINT16 const usItem)
+{
+	switch (usItem)
+	{
+		case NIGHTGOGGLES:
+		case UVGOGGLES:
+		case SUNGOGGLES:
+		case GASMASK:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
+
 static BOOLEAN BulletHitMerc(BULLET* pBullet, STRUCTURE* pStructure, BOOLEAN fIntended)
 {
 	SOLDIERTYPE* const pFirer = pBullet->pFirer;
@@ -1969,14 +1986,14 @@ static BOOLEAN BulletHitMerc(BULLET* pBullet, STRUCTURE* pStructure, BOOLEAN fIn
 			{
 				// lucky bastard was facing away!
 			}
-			else if ((tgt.inv[HEAD1POS].usItem == NIGHTGOGGLES || tgt.inv[HEAD1POS].usItem == SUNGOGGLES ||
-				tgt.inv[HEAD1POS].usItem == GASMASK) && static_cast<INT8>(PreRandom(100)) < tgt.inv[HEAD1POS].bStatus[0])
+			else if (ItemShieldsEyesFromSpit(tgt.inv[HEAD1POS].usItem) &&
+				static_cast<INT8>(PreRandom(100)) < tgt.inv[HEAD1POS].bStatus[0])
 			{
 				// lucky bastard was wearing protective stuff
 				bHeadSlot = HEAD1POS;
 			}
-			else if ((tgt.inv[HEAD2POS].usItem == NIGHTGOGGLES || tgt.inv[HEAD2POS].usItem == SUNGOGGLES ||
-				tgt.inv[HEAD2POS].usItem == GASMASK) && static_cast<INT8>(PreRandom(100)) < tgt.inv[HEAD2POS].bStatus[0])
+			else if (ItemShieldsEyesFromSpit(tgt.inv[HEAD2POS].usItem) &&
+				static_cast<INT8>(PreRandom(100)) < tgt.inv[HEAD2POS].bStatus[0])
 			{
 				// lucky bastard was wearing protective stuff
 				bHeadSlot = HEAD2POS;

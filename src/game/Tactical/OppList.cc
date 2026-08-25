@@ -997,8 +997,10 @@ INT16 DistanceVisible(const SOLDIERTYPE* pSoldier, INT8 bFacingDir, INT8 bSubjec
 				}
 
 			}
-			// UV goggles only function above ground... ditto for bloodcats
-			else if (gWorldSector.z == 0)
+			// UV goggles see by heat, so they work underground too - that is the whole
+			// point of them over light-intensifying night goggles. Bloodcat eyes get the
+			// same bonus, but only above ground.
+			else if (IsWearingHeadGear(*pSoldier, UVGOGGLES) || gWorldSector.z == 0)
 			{
 				sDistVisible += UVGOGGLES_BONUS;
 			}
