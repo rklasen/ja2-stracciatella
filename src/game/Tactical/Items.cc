@@ -35,6 +35,8 @@
 #include "Smell.h"
 #include "Soldier_Macros.h"
 #include "Debug.h"
+#include "English.h"
+#include "Input.h"
 
 #include "AmmoTypeModel.h"
 #include "CalibreModel.h"
@@ -1849,6 +1851,67 @@ static void CollectKey(SOLDIERTYPE const& s, OBJECTTYPE const& o)
 }
 
 
+// A gun that takes a smaller magazine than the one it was just reloaded from leaves the rest of
+// the rounds sitting in an oversized magazine, where they are of no use to it - a 30 round mag
+// with 20 rounds left in it after loading a 10 round gun.  Repack what is left into magazines the
+// gun actually takes and hand them to the merc.  This is held on the shift key so that the player
+// keeps the choice of leaving the big magazine whole for a gun that can empty it in one go.
+static void SplitOversizedMagazine(SOLDIERTYPE* const pSoldier, const OBJECTTYPE* const pGun, OBJECTTYPE* const pAmmo)
+{
+	if (pAmmo->ubNumberOfObjects == 0) return;
+
+	const ItemModel* const item = GCM->getItem(pAmmo->usItem, ItemSystem::nothrow);
+	if (item == NULL || !item->isAmmo()) return;
+
+	const MagazineModel* const mag = item->asAmmo();
+	const WeaponModel*   const gun = GCM->getWeapon(pGun->usItem);
+
+	UINT8 const ubMagSize = gun->ubMagSize;
+	if (ubMagSize == 0)             return;
+	if (mag->capacity <= ubMagSize) return; // nothing oversized about it
+
+	UINT8 const ubRoundsLeft = pAmmo->ubShotsLeft[0];
+	if (ubRoundsLeft == 0) return;
+
+	// the magazine this gun takes, holding the same kind of round as the one we are emptying
+	UINT16 const usSmallMag = FindReplacementMagazine(gun->calibre, ubMagSize, mag->ammoType->index);
+	if (usSmallMag == NOTHING) return;
+
+	const MagazineModel* const smallMag = GCM->getMagazineByItemIndex(usSmallMag);
+	if (smallMag == NULL || smallMag->ammoType->index != mag->ammoType->index) return;
+
+	UINT8 ubMags = ubRoundsLeft / ubMagSize + (ubRoundsLeft % ubMagSize != 0 ? 1 : 0);
+	if (ubMags > MAX_OBJECTS_PER_SLOT) ubMags = MAX_OBJECTS_PER_SLOT;
+
+	OBJECTTYPE Split;
+	CreateItems(usSmallMag, 100, ubMags, &Split);
+
+	UINT16 const uiToMove = std::min<UINT16>(ubRoundsLeft, ubMags * ubMagSize);
+	UINT16       uiLeft   = uiToMove;
+	for (UINT8 ubObj = 0; ubObj < ubMags; ++ubObj)
+	{
+		UINT8 const ubHere = static_cast<UINT8>(std::min<UINT16>(uiLeft, ubMagSize));
+		Split.ubShotsLeft[ubObj] = ubHere;
+		uiLeft -= ubHere;
+	}
+
+	AutoPlaceObject(pSoldier, &Split, TRUE);
+
+	// whatever would not fit into his pockets is left in the big magazine instead
+	UINT16 uiNotPlaced = 0;
+	for (UINT8 ubObj = 0; ubObj < Split.ubNumberOfObjects; ++ubObj)
+	{
+		uiNotPlaced += Split.ubShotsLeft[ubObj];
+	}
+
+	UINT16 const uiMoved = uiToMove - uiNotPlaced;
+	if (uiMoved == 0) return;
+
+	pAmmo->ubShotsLeft[0] -= static_cast<UINT8>(uiMoved);
+	if (pAmmo->ubShotsLeft[0] == 0) RemoveObjs(pAmmo, 1);
+}
+
+
 BOOLEAN PlaceObject( SOLDIERTYPE * pSoldier, INT8 bPos, OBJECTTYPE * pObj )
 {
 	// returns object to have in hand after placement... same as original in the
@@ -1998,8 +2061,15 @@ BOOLEAN PlaceObject( SOLDIERTYPE * pSoldier, INT8 bPos, OBJECTTYPE * pObj )
 					{
 						if (GCM->getWeapon(pInSlot->usItem)->matches(item->asAmmo()->calibre))
 						{
+							// shift asks for the rest of an oversized magazine to be repacked
+							BOOLEAN const fSplitRest = _KeyDown(SHIFT);
+
 							// reload...
-							return( ReloadGun( pSoldier, pInSlot, pObj ) );
+							if (!ReloadGun( pSoldier, pInSlot, pObj )) return( FALSE );
+
+							if (fSplitRest) SplitOversizedMagazine( pSoldier, pInSlot, pObj );
+
+							return( TRUE );
 						}
 						else
 						{
