@@ -51,6 +51,11 @@ if (SCCACHE_PROGRAM)
         "RUSTC_WRAPPER=${SCCACHE_PROGRAM}"
     )
 endif()
+if (APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
+    # rustc picks the build machine's macOS version unless told otherwise, and
+    # linking those objects against older C++ objects warns and can fail.
+    list(APPEND CARGO_ENV "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
 if (MINGW OR ANDROID)
     string(MAKE_C_IDENTIFIER "CARGO_TARGET_${CARGO_BUILD_TARGET}_LINKER" var)
     string(TOUPPER "${var}" var)
