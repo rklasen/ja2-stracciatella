@@ -41,9 +41,41 @@ add_dependencies(${LAUNCHER_BINARY} stracciatella)
 
 if (NOT LOCAL_FLTK_LIB AND APPLE)
     find_package(PNG REQUIRED)
+
+    # The archives below live in the Homebrew keg, whose prefix differs between
+    # Apple Silicon (/opt/homebrew) and Intel (/usr/local), so ask brew for it
+    # rather than hardcoding one of the two.
+    if(NOT FLTK13_PREFIX)
+        find_program(BREW_EXECUTABLE brew)
+        if(BREW_EXECUTABLE)
+            execute_process(
+                COMMAND "${BREW_EXECUTABLE}" --prefix fltk@1.3
+                OUTPUT_VARIABLE FLTK13_BREW_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE FLTK13_BREW_RESULT)
+            if(FLTK13_BREW_RESULT EQUAL 0)
+                set(FLTK13_PREFIX "${FLTK13_BREW_PREFIX}" CACHE PATH "Prefix of the fltk@1.3 installation the launcher links against")
+            endif()
+        endif()
+    endif()
+    if(NOT FLTK13_PREFIX)
+        message(FATAL_ERROR "Could not locate fltk@1.3. Install it with `brew install fltk@1.3`, or point FLTK13_PREFIX at a prefix that contains lib/libfltk.a.")
+    endif()
+
     # force static linking
+    set(FLTK13_STATIC_LIBRARIES "")
+    foreach(FLTK13_LIBRARY fltk_forms fltk_images fltk)
+        set(FLTK13_ARCHIVE "${FLTK13_PREFIX}/lib/lib${FLTK13_LIBRARY}.a")
+        if(NOT EXISTS "${FLTK13_ARCHIVE}")
+            message(FATAL_ERROR "Expected a static fltk@1.3 archive at ${FLTK13_ARCHIVE} but it does not exist.")
+        endif()
+        list(APPEND FLTK13_STATIC_LIBRARIES "${FLTK13_ARCHIVE}")
+    endforeach()
+    message(STATUS "Fltk static libraries: ${FLTK13_STATIC_LIBRARIES}")
+
     target_link_libraries(${LAUNCHER_BINARY} PRIVATE
-        /opt/homebrew/opt/fltk@1.3/lib/libfltk_forms.a /opt/homebrew/opt/fltk@1.3/lib/libfltk_images.a /opt/homebrew/opt/fltk@1.3/lib/libfltk.a ${PNG_LIBRARIES}
+        ${FLTK13_STATIC_LIBRARIES} ${PNG_LIBRARIES}
     )
 else ()
     target_link_libraries(${LAUNCHER_BINARY} PRIVATE
