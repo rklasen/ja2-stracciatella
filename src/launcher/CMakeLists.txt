@@ -74,6 +74,12 @@ if (NOT LOCAL_FLTK_LIB AND APPLE)
     endforeach()
     message(STATUS "Fltk static libraries: ${FLTK13_STATIC_LIBRARIES}")
 
+    # find_package finds whichever fltk is linked into the Homebrew prefix, and
+    # that is 1.4 on a machine that also has the `fltk` formula installed. The
+    # archives above are 1.3, so take the headers from the same keg or the
+    # launcher compiles against 1.4 declarations and fails to link.
+    set(FLTK_INCLUDE_DIR "${FLTK13_PREFIX}/include")
+
     target_link_libraries(${LAUNCHER_BINARY} PRIVATE
         ${FLTK13_STATIC_LIBRARIES} ${PNG_LIBRARIES}
     )
