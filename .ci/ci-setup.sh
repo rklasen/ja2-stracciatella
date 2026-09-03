@@ -46,7 +46,7 @@ elif [[ "$CI_TARGET" == "mac" ]]; then
     macOS-install-via-brew sccache
 
     # fltk for the launcher
-    macOS-install-and-overwrite-via-brew fltk@1.3
+    macOS-install-via-brew fltk@1.3
 
     # gtest
     macOS-install-via-brew googletest

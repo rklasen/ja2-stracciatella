@@ -7,7 +7,43 @@ if(NOT BUILD_LAUNCHER)
     return()
 endif()
 
-if (NOT LOCAL_FLTK_LIB)
+if (NOT LOCAL_FLTK_LIB AND APPLE)
+    # fltk@1.3 is a versioned formula, so Homebrew keeps it keg-only and links
+    # nothing into the prefix for find_package to pick up. Ask brew where the keg
+    # is and take the headers and the archives from there, instead of expecting
+    # the prefix to be relinked in favour of this project.
+    if(NOT FLTK13_PREFIX)
+        find_program(BREW_EXECUTABLE brew)
+        if(BREW_EXECUTABLE)
+            execute_process(
+                COMMAND "${BREW_EXECUTABLE}" --prefix fltk@1.3
+                OUTPUT_VARIABLE FLTK13_BREW_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE FLTK13_BREW_RESULT)
+            if(FLTK13_BREW_RESULT EQUAL 0)
+                set(FLTK13_PREFIX "${FLTK13_BREW_PREFIX}" CACHE PATH "Prefix of the fltk@1.3 installation the launcher links against")
+            endif()
+        endif()
+    endif()
+    if(NOT FLTK13_PREFIX)
+        message(FATAL_ERROR "Could not locate fltk@1.3. Install it with `brew install fltk@1.3`, set FLTK13_PREFIX to a prefix that contains lib/libfltk.a, or configure with -DBUILD_LAUNCHER=OFF.")
+    endif()
+
+    # The launcher links these statically, so the headers have to come from the
+    # same keg. find_package would hand out whichever fltk is linked into the
+    # prefix, and that is 1.4 wherever the unversioned formula is installed.
+    set(FLTK_INCLUDE_DIR "${FLTK13_PREFIX}/include")
+    set(FLTK_STATIC_LIBRARIES "")
+    foreach(FLTK_LIBRARY_NAME fltk_forms fltk_images fltk)
+        set(FLTK_ARCHIVE "${FLTK13_PREFIX}/lib/lib${FLTK_LIBRARY_NAME}.a")
+        if(NOT EXISTS "${FLTK_ARCHIVE}")
+            message(FATAL_ERROR "Expected a static fltk@1.3 archive at ${FLTK_ARCHIVE} but it does not exist.")
+        endif()
+        list(APPEND FLTK_STATIC_LIBRARIES "${FLTK_ARCHIVE}")
+    endforeach()
+    set(FLTK_LIBRARIES "${FLTK_STATIC_LIBRARIES}")
+elseif (NOT LOCAL_FLTK_LIB)
     find_package(FLTK)
     if(NOT FLTK_FOUND)
         message(STATUS "FLTK not found. Disabling launcher.")
@@ -40,10 +76,10 @@ set_target_properties(${LAUNCHER_BINARY}
 add_dependencies(${LAUNCHER_BINARY} stracciatella)
 
 if (NOT LOCAL_FLTK_LIB AND APPLE)
+    # libfltk_images.a leaves its png symbols to the caller.
     find_package(PNG REQUIRED)
-    # force static linking
     target_link_libraries(${LAUNCHER_BINARY} PRIVATE
-        /opt/homebrew/opt/fltk@1.3/lib/libfltk_forms.a /opt/homebrew/opt/fltk@1.3/lib/libfltk_images.a /opt/homebrew/opt/fltk@1.3/lib/libfltk.a ${PNG_LIBRARIES}
+        ${FLTK_LIBRARIES} ${PNG_LIBRARIES}
     )
 else ()
     target_link_libraries(${LAUNCHER_BINARY} PRIVATE

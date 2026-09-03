@@ -59,11 +59,6 @@ macOS-install-via-brew () {
     brew install $@
 }
 
-macOS-install-and-overwrite-via-brew () {
-    brew install $@
-    brew link --overwrite $@
-}
-
 macOS-install-via-brew-cask () {
     brew install --cask google-cloud-sdk
 }
@@ -88,3 +83,4 @@ windows-install-google-cloud-sdk () {
     unzip -q "$ARCHIVE_PATH" -d $UNZIP_PATH
     export PATH="$PATH;$UNZIP_PATH\google-cloud-sdk\bin"
 }
+
